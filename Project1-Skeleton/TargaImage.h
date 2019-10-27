@@ -44,9 +44,10 @@ class TargaImage
         bool Dither_FS();
 		void calcThresh(int i, float * output, int over, int below, int downL, int downR);
 		void leftRight(int i, int j, float * output);
-		void rightLeft(int i, int j, float * output);
+		void rightLeft(int i, int j, float * output, int start);
         bool Dither_Bright();
         bool Dither_Cluster();
+		void compareAndAssign(int i, int j, float filter[4][4]);
         bool Dither_Color();
 
         bool Comp_Over(TargaImage* pImage);
@@ -61,7 +62,7 @@ class TargaImage
         bool Filter_Bartlett();
         bool Filter_Gaussian();
 		double* generateGaussFilter(int n);	
-		void applyFilter(double * mask, int n, unsigned char * newData, int i, int widthRGB, int j);
+		void applyFilter(double * mask, int filterSize, unsigned char * newData, int rowOffset, int i, int j);
 		void RGB_To_RGBA(unsigned char *rgba, unsigned char *rgb);
 		void To_RGBA(unsigned char* newData);
         bool Filter_Gaussian_N(unsigned int N);
