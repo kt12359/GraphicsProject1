@@ -47,8 +47,11 @@ class TargaImage
 		void rightLeft(int i, int j, float * output, int start);
         bool Dither_Bright();
         bool Dither_Cluster();
-		void compareAndAssign(int i, int j, float filter[4][4]);
+		void compareAndAssign(int i, int j, float clusterMatrix[16]);
         bool Dither_Color();
+		void leftRightC(int i, int j, float * output);
+		void rightLeftC(int i, int j, float * output, int start);
+		void calcThreshColor(int i, float * output, int over, int below, int downL, int downR);
 
         bool Comp_Over(TargaImage* pImage);
         bool Comp_In(TargaImage* pImage);

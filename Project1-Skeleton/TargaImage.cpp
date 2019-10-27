@@ -272,7 +272,7 @@ bool sortingFunc(const colorHist & obj1, const colorHist & obj2){
 }
 bool TargaImage::Quant_Populosity()
 {
-	int i, j = 0, size = width * height * 4, histSize = 32*32*32+1; //total possible colors = 32*32*32m(a little bigger because one was outside range), 256 colors * 4 (rgba) for final image
+	int i, j = 0, size = width * height * 4, histSize = 32*32*32; //total possible colors = 32*32*32
 	long startIndex = 0, big = 5000000; //set proximity to some arbitrarily large number to make sure it is properly initialized
 	long colorIndex = 0, colorToMap = 0, toCompare = 0;
 	double currProx = 0, proximity = big;
@@ -282,21 +282,15 @@ bool TargaImage::Quant_Populosity()
 
 	for(i = 0; i < size; i +=4)
 	{
-		/*data[i+RED] = (unsigned char)(data[i+RED] / scalingFactor);								//scale each color down to 5 bits (scaling factor is remainder of largest possible, so 255, divided by 32)  
-		data[i+GREEN] = (unsigned char)(data[i+GREEN] / scalingFactor);
-		data[i+BLUE] = (unsigned char)(data[i+BLUE] / scalingFactor);
-		colorIndex = (data[i+RED] + (((unsigned int)data[i+GREEN] << 5) + ((unsigned int)data[i+BLUE] << 10)));*/		//store bits of pixel in long, ignore alpha
 		r = (unsigned char)(data[i+RED]/scalingFactor);
 		g = (unsigned char)(data[i+GREEN]/scalingFactor);
 		b = (unsigned char)(data[i+BLUE]/scalingFactor);
-		colorIndex = (r + (((unsigned int)g << 5) + ((unsigned int)b << 10)));
-		assert(colorIndex < 32768);
+		colorIndex = (r + (((unsigned int)g << 5) + ((unsigned int)b << 10)));			//store bits of pixel in long, ignore alpha, this will be index in histogram
+		//assert(colorIndex < 32768);
 		colors[colorIndex].r = (int)data[i+RED];
 		colors[colorIndex].g = (int)data[i+GREEN];
 		colors[colorIndex].b = (int)data[i+BLUE];
 		++colors[colorIndex].count;
-		//colors[colorIndex].color = colorIndex;
-		//++colors[colorIndex].count;
 	}
 
 	sort(colors.begin(),colors.end(),sortingFunc);										//sort colors by number of times they were found in histogram
@@ -304,33 +298,19 @@ bool TargaImage::Quant_Populosity()
 	for(i = 0; i < size; i+=4)															//Check each color in original data set against most popular colors in histogram
 	{
 		proximity = big;																//reset the proximity each time we loop
-		//toCompare = (data[i+RED] + (((unsigned int)data[i+GREEN] << 5) + ((unsigned int)data[i+BLUE] << 10)));		//convert current color to bits
 		for(j = startIndex; j < histSize; ++j)
 		{
-			/*currProx = abs(colors[j].color - toCompare);								//determine whether this color in most popular colors array is closest to current color
-			if(currProx <= proximity) {
-				proximity = currProx;
-				colorToMap = colors[j].color;											
-			}*/
 			currProx = sqrt(((data[i+RED]-colors[j].r)*(data[i+RED]-colors[j].r))+((data[i+GREEN]-colors[j].g)*(data[i+GREEN]-colors[j].g))+((data[i+BLUE]-colors[j].b)*(data[i+BLUE]-colors[j].b)));
 			if(currProx < proximity){
 				proximity = currProx;
 				colorToMap = j;
 			}
 		}
-		/*data[i+RED] = (unsigned char)floor((colorToMap & 0xff)*scalingFactor);					 //convert back to 24 bit unsigned char so it will display properly
-		data[i+GREEN] = (unsigned char)floor(((colorToMap >> 5) & 0xff)* scalingFactor); 
-		data[i+BLUE] = (unsigned char)floor(((colorToMap >> 10) & 0xff) * scalingFactor);*/
 		data[i+RED] = (unsigned char)colors[colorToMap].r;
 		data[i+GREEN] = (unsigned char)colors[colorToMap].g;
 		data[i+BLUE] = (unsigned char)colors[colorToMap].b;
 	}
-	/*for(i = 0; i < size; i+=4)
-	{
-		data[i+RED] *= 32;
-		data[i+GREEN] *= 32;
-		data[i+BLUE] *= 64;
-	}*/
+
     return true;
 }// Quant_Populosity
 
@@ -481,13 +461,6 @@ void TargaImage::rightLeft(int i, int j, float * output, int start)
 	if((j*4) >= start)
 		downL = -7; 
 	int currIndex = rowOffset + (start-(j*4)); 
-	assert(left < width*height*4);
-	assert(downR < width*height*4);
-	assert(downL < width*height*4);
-	assert(down < width*height*4);
-	assert(currIndex >= 0);
-	assert(down < width*height*4);
-	assert(currIndex < width*height*4);
 	calcThresh(currIndex,output,left,down,downL,downR);
 }
 
@@ -567,32 +540,32 @@ bool TargaImage::Dither_Bright()
 bool TargaImage::Dither_Cluster()
 {
 	int i, j, size = width * height * 4;
-	float filter[4][4] = {{0.7500,  0.3750,  0.6250,  0.2500},
-						  {0.0625,  1.0000,  0.8750,  0.4375},
-						  {0.5000,  0.8125,  0.9375,  0.1250},
-						  {0.1875,  0.5625,  0.3125,  0.6875}};
+	float clusterMatrix[16] = {0.7500,  0.3750,  0.6250,  0.2500,
+							   0.0625,  1.0000,  0.8750,  0.4375,
+							   0.5000,  0.8125,  0.9375,  0.1250,
+							   0.1875,  0.5625,  0.3125,  0.6875};
 	To_Grayscale();
 	for(i = 0; i < height; i+=4)
 	{
-		for(j = 0; j < width*4; j+=16)		//compare 4 pixels with matrix before moving on
+		for(j = 0; j < width*4; j+=16)		//compare 4 pixels with matrix before moving on to next row
 		{
-			compareAndAssign(i,j,filter);
+			compareAndAssign(i,j,clusterMatrix);
 		}
 	}
     return false;
 }// Dither_Cluster
 
-void TargaImage::compareAndAssign(int i, int j, float filter[4][4])
+void TargaImage::compareAndAssign(int i, int j, float clusterMatrix[])
 {
 	int u, v, iOffset = i, rowOffset, jOffset = j;
 	float color = 0.0;
-	for(u = 0; u < 4 && iOffset < height; ++u)
+	for(u = 0; u < 4; ++u)
 	{
 		rowOffset = iOffset*width*4;
 		for(v = 0; v < 4 && jOffset < width*4; ++v)
 		{
 			color = data[rowOffset+jOffset]/256.0;
-			color >= filter[u%4][v%4] ? data[rowOffset+jOffset] = 255 : data[rowOffset+jOffset] = 0;
+			color >= clusterMatrix[(u%4)*4+v%4] ? data[rowOffset+jOffset] = 255 : data[rowOffset+jOffset] = 0;
 			data[rowOffset+jOffset+GREEN] = data[rowOffset+jOffset+BLUE] = data[rowOffset+jOffset];
 			jOffset += 4;
 		}
@@ -610,9 +583,131 @@ void TargaImage::compareAndAssign(int i, int j, float filter[4][4])
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_Color()
 {
-    ClearToBlack();
-    return false;
+	int i, j, size = width * height * 4, rowOffset, start = width*4-4;
+	float * output = new float[size];
+	for(i = 0; i < size; ++i)
+		output[i] = 0;
+	//quantize
+	for (int i = 0; i < height; ++i)
+	{
+		rowOffset = i * width * 4;
+		for (int j = 0; j < width; ++j)
+		{
+			output[rowOffset + j * 4 + RED] = data[rowOffset + j * 4 + RED] / 32.0;
+			output[rowOffset + j * 4 + GREEN] = data[rowOffset + j * 4 + GREEN] / 32.0;
+			output[rowOffset + j * 4 + BLUE] = data[rowOffset + j * 4 + BLUE] / 64.0;
+		}
+	}
+	//dither
+	for(i = 0; i < height; ++i)
+	{
+		for(j = 0; j < width ; ++j)
+		{
+			if(i%2==0)							//we are at an even row, so we should go from left to right
+				leftRightC(i,j,output);
+			else
+				rightLeftC(i,j,output,start);			//odd row, so we go right to left
+		}
+	}
+	//transfer modified data back to original array
+	for (int i = 0; i < height; ++i)
+	{
+		rowOffset = i * width * 4;
+		for (int j = 0; j < width; ++j)
+		{
+			data[rowOffset + j * 4] = (unsigned char)output[rowOffset + j * 4]*32;
+			if(output[rowOffset + j * 4] > 7) data[rowOffset + j * 4] = 255;
+			data[(rowOffset + j * 4) + GREEN] = (unsigned char)output[(rowOffset + j * 4) + GREEN]*32;
+			if(output[rowOffset + j * 4 + GREEN] > 7) data[rowOffset + j * 4 + GREEN] = 255;
+			data[(rowOffset + j * 4) + BLUE] = (unsigned char)output[(rowOffset + j * 4) + BLUE]*64;
+			if(output[rowOffset + j * 4 + BLUE] > 3) data[rowOffset + j * 4 + BLUE] = 255;
+		}
+	}
+	delete [] output;
+    return true;
 }// Dither_Color
+
+void TargaImage::leftRightC(int i, int j, float * output) 
+{ 
+ 	int right, down, downL, downR, realWidth = width * 4, rowOffset = i * width * 4; 
+ 	right = rowOffset + ((j*4) +4); 
+ 	if((j*4) >= realWidth-4)  
+ 		right = -7;			//set to some arbitrary invalid index, this will fail check in function that calculates error 
+ 	down = (i+1)* realWidth + (j*4); 
+ 	downL = (i+1)*realWidth+((j*4)-4); 
+ 	downR = (i+1)*realWidth+((j*4)+4); 
+ 	if(i+1 >= height){ 
+ 		down = -7; 
+ 		downL = -7; 
+ 		downR = -7; 
+ 	} 
+ 	if(j*4+4 >= realWidth) 
+ 		downR = -7; 
+ 	if(j == 0) 
+ 		downL = -7; 
+ 	int currIndex = rowOffset + j*4; 
+ 	calcThreshColor(currIndex,output,right,down,downL,downR); 
+} 
+  
+
+void TargaImage::rightLeftC(int i, int j, float * output, int start) 
+{ 
+	int left, down, downL, downR, realWidth = width * 4, rowOffset = i * width * 4; 
+ 	left = i * realWidth + (start-(j*4) - 4); 
+	if((j*4) >= start || left >= width*height*4)  
+		left = -7; 
+	down = (i+1)*realWidth+(start-(j*4)); 
+	downL = (i+1)*realWidth+(start-(j*4+4)); 
+	downR = (i+1)*realWidth+(start-(j*4-4)); 
+	if(i+1 >= height){ 
+		down = -7; 
+		downL = -7; 
+		downR = -7; 
+	} 
+	if(j == 0) 
+		downR = -7; 
+	if((j*4) >= start)
+		downL = -7; 
+	int currIndex = rowOffset + (start-(j*4)); 
+	calcThreshColor(currIndex,output,left,down,downL,downR);
+}
+
+void TargaImage::calcThreshColor(int i, float * output, int over, int below, int downL, int downR)
+{
+		double error = 0, difference = 0, down = 5.0/16.0, leftDown = 3.0/16.0, right = 7.0/16.0, rightDown = 1.0/16.0;
+		int t = 0, result = 0, color = 0, colorInTable;
+
+		while(color < 3) {
+			if(color < 2)
+				colorInTable = data[i+color]/32;
+			else
+				colorInTable = data[i+color]/64;
+			difference = output[i + color] - colorInTable;
+			if(difference <= 0.5){
+				output[i+color] = colorInTable;
+				error = difference;
+			}
+			else{
+				output[i+color] = colorInTable+1;
+				error = difference-1;
+			}
+
+		if(below >= 0){
+		output[below+color]+= (down*error);
+		}
+		if(downR >= 0){
+		output[downR+color] += (rightDown*error); //downOver is right on even rows, left on odd rows
+		}
+		if(over >= 0){
+		output[over+color] += (right * error); 
+		}
+		if(downL >= 0){
+			output[downL+color] += (leftDown * error);
+		}
+		++color;
+		}
+
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -795,22 +890,46 @@ bool TargaImage::Filter_Bartlett()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Gaussian()
 {
-	int i = 0, j = 0, filterSize = 5, sizeRGBA = width * height * 4, rowOffset = i * width * 4;
-	double sum = 0.0;
+	int i = 0, j = 0, filterSize = 5, sizeRGBA = width * height * 4, rowOffset = i * width * 4, color = 0;
+	double sum = 256.0;
 	unsigned char * newData = new unsigned char[sizeRGBA];
 
 	for(i = 0; i < sizeRGBA; ++i)		//initialize entire array to 0 to start
 		newData[i] = 0;
 
-	double * mask = generateGaussFilter(filterSize);
-
-	//apply mask to image
-	for (i = 2 ; i < height-2 ; ++i)	//ignore edges
+	double mask [25] = {1.0, 4.0, 6.0, 4.0, 1.0,
+						4.0, 16.0, 24.0, 16.0, 4.0,
+						6.0, 24.0, 36.0, 24.0, 6.0,
+						4.0, 16.0, 24.0, 16.0, 4.0,
+						1.0, 4.0, 6.0, 4.0, 1.0};
+	//normalize matrix
+	for(i = 0; i < 5; ++i)
+	{
+		for(int j = 0; j < 5; ++j){
+		mask[i*5+j] /= sum;
+		}
+	}
+	//apply filter
+	for (int i = 2 ; i < height-2 ; ++i)
     {
-		rowOffset = i * width * 4;
-		for (j = 2 ; j < width-2 ; ++j)	//ignore edges
-			applyFilter(mask, filterSize, newData, rowOffset, i, j);
-    }
+		int row_offset = i * width * 4;
+		for (int j = 2 ; j < width-2 ; ++j)
+		{
+			color = 0;
+			while(color<3){  //to get the sum for each color at current index, iterate over r first, add sum of result of filter to a, repeat for g and b.
+				sum = 0;
+				for(int u = -2; u <= 2; ++u){
+					for(int v = -2; v <= 2; ++v){
+						sum += data[(i+u)*width*4 + (j+v)*4 + color]*mask[(u+2)*5+v+2];
+					}
+				newData[(row_offset + j*4) + color] = sum;
+				}
+				sum = 0;
+				++color;
+			}
+		}
+	}
+	//copy from newData to data
 	for (i = 2; i < height - 2; ++i)
 	{
 		for (j = 2; j < width - 2; ++j)
@@ -821,7 +940,6 @@ bool TargaImage::Filter_Gaussian()
 			data [(rowOffset + j * 4) + BLUE] = newData[(rowOffset + j * 4) + BLUE];
 		}
 	}
-	delete [] mask;
 	delete [] newData;
 	return true;
 }// Filter_Gaussian
@@ -834,7 +952,7 @@ void TargaImage::applyFilter(double * mask, int filterSize, unsigned char * newD
 		sum = 0;
 		for(int u = -halfFilterSize; u <= halfFilterSize; ++u){
 			for(v = -halfFilterSize; v <= halfFilterSize; ++v){
-				indexI = i+u;//ADDED THIS -- edge detection for gaussian filter
+				indexI = i+u;
 				indexJ = j+v;
 				if(indexI < 0)
 					indexI = 0;
